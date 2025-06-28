@@ -1,0 +1,8 @@
+/target
+
+/data
+.venv
+
+*.ply
+*.bin
+*.label
