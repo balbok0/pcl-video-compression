@@ -6,3 +6,10 @@
 *.ply
 *.bin
 *.label
+
+*.mp4
+*.tar
+*.pcap
+*.json
+*.pkl
+*.pyc
