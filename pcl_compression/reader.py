@@ -1,5 +1,7 @@
 import pickle
+import shutil
 import tarfile
+import tempfile
 from os import PathLike
 from pathlib import Path
 from typing import Iterator
@@ -9,6 +11,7 @@ import ouster.cli.core
 import ouster.sdk
 import ouster.sdk.client
 
+import av
 import cv2
 import yaml
 import numpy as np
@@ -116,6 +119,99 @@ class PCLVideoReader:
 
     def __iter__(self) -> Iterator[list[ouster.sdk.client.LidarScan | None]]:
         fields = self.fields
+        # Sort fields and channels accordingly
+        fields_channels = self._pcl_vid_metadata["fields_to_channels"]
+        for field in fields_channels.keys():
+            fields_channels[field] = list(sorted(fields_channels[field]))
 
-        cv2.
-        pass
+        # Proof of concept. Should read from file directly
+        td = tempfile.gettempdir()
+        td_path = Path(td)
+
+        fields_vid_captures = {}
+        for field, channels in fields_channels.items():
+            field_vids = []
+            for c, _ in channels:
+                f_name = f"{field}_ch{c}.mp4"
+                self.tar_file.extract(f"{field}_ch{c}.mp4", td_path)
+
+                container = av.open(td_path / f_name, mode="r")
+                # vc = cv2.VideoCapture(str((td_path / f_name).absolute()))
+                # vc.set(cv2.CAP_PROP_CONVERT_RGB, 0)
+                # vc.set(cv2.CAP_PROP_CONVERT_RGB, 0)
+                field_vids.append(container.decode(0))
+
+
+            fields_vid_captures[field] = field_vids
+        return PacketIterator(
+            field_vid_captures=fields_vid_captures,
+            fields=self.field_types,
+            temp_dir=td_path
+        )
+
+
+class PacketIterator:
+    def __init__(
+        self,
+        field_vid_captures: dict[str, list[Iterator[av.VideoFrame]]],
+        fields: ouster.sdk.client.data.FieldTypes,
+        temp_dir: Path
+    ):
+
+        self.field_vid_captures = field_vid_captures
+        self.fields = {
+            field.name: field
+            for field in fields
+        }
+        self.temp_dir = temp_dir
+
+    def __next__(self):
+        frames = {}
+        for field, vids in self.field_vid_captures.items():
+            field_frames = [
+                next(vid).to_ndarray(channel_last=True)
+                for vid in vids
+            ]
+
+            if len(field_frames) == 1:
+                frames[field] = field_frames[0]
+                continue
+
+            cat_view = np.concatenate([a[..., np.newaxis] for a in field_frames], axis=-1)
+            frames[field] = cat_view.view(self.fields[field].element_type)[..., 0]
+        return frames
+
+    def __del__(self):
+        shutil.rmtree(self.temp_dir)
+
+"""
+Packet class
+
+methods:
+'add_field'
+'alert_flags'
+'complete'
+'del_field'
+'field'
+'field_class'
+'field_types'
+'fields'
+'frame_id'
+'frame_status'
+'get_first_valid_column_timestamp'
+'get_first_valid_packet_timestamp'
+'h'
+'has_field'
+'measurement_id'
+'packet_count'
+'packet_timestamp'
+'pose'
+'sensor_info'
+'shot_limiting'
+'shot_limiting_countdown'
+'shutdown_countdown'
+'status'
+'thermal_shutdown'
+'timestamp'
+'w'
+"""

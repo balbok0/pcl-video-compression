@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import ouster
 import ouster.sdk
 
@@ -35,3 +36,35 @@ def test_consistency_properties(
 
 
     # print(source)
+
+def test_consistency_iter(
+    tar_path: Path,
+    raw_pcap_path: Path
+):
+    source_tar = PCLVideoReader(tar_path)
+    source_pcap = ouster.sdk.pcap.pcap_scan_source.PcapScanSource(str(raw_pcap_path.absolute())).single_source(0)
+
+    pcap_iter = iter(source_pcap)
+    it_num = 0
+    for tar_packet in source_tar:
+        pcap_packet = next(pcap_iter)
+
+        # Check fields are correct
+        for key in tar_packet.keys():
+            np.testing.assert_allclose(
+                tar_packet[key],
+                pcap_packet.field(key),
+                err_msg=f"For field {key}"
+            )
+
+        # Check other properties
+        for prop in [
+            "timestamp",
+            "alert_flags",
+            "packet_timestamp",
+            "timestamp",
+        ]:
+
+            pass
+
+        it_num += 1
