@@ -108,6 +108,9 @@ def make_png_folders(pcap_file: Path):
             frame = packet.field(field)
             fields_channels_types.update(parse_frame(frame, packet_ts, field))
 
+
+        parse_frame(packet.pose.reshape(-1, 16), packet_ts, "pose")
+
         for field_name in ["timestamp", "packet_timestamp", "status", "alert_flags"]:
             folder_name = Path("data/packets") / field_name
             folder_name.mkdir(parents=True, exist_ok=True)
@@ -182,7 +185,13 @@ def make_tarfile(
         for mp4_path in packets_path.glob("*.mp4"):
             tf.add(mp4_path, mp4_path.name)
 
+        # Add basic metadata
         tf.add(json_path, "metadata.json")
+
+        # Add npy arrays
+        root_workdir = Path("data/packets")
+        for npy_path in root_workdir.rglob("*.npy"):
+            tf.add(npy_path, npy_path.relative_to(root_workdir))
 
         # Write additional meta to temp file
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -178,7 +178,15 @@ class PacketIterator:
                 continue
 
             cat_view = np.concatenate([a[..., np.newaxis] for a in field_frames], axis=-1)
-            frames[field] = cat_view.view(self.fields[field].element_type)[..., 0]
+            field_frame = cat_view.view(self.fields[field].element_type)[..., 0]
+
+            frames[field] = field_frame
+            if "h" not in frames:
+                frames["h"] = field_frame.shape[0]
+                frames["w"] = field_frame.shape[1]
+
+        # TODO: Populate everything else
+
         return frames
 
     def __del__(self):

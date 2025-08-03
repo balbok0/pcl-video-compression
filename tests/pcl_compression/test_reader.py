@@ -50,11 +50,11 @@ def test_consistency_iter(
         pcap_packet = next(pcap_iter)
 
         # Check fields are correct
-        for key in tar_packet.keys():
+        for field in source_tar.fields:
             np.testing.assert_allclose(
-                tar_packet[key],
-                pcap_packet.field(key),
-                err_msg=f"For field {key}"
+                tar_packet[field],
+                pcap_packet.field(field),
+                err_msg=f"For field {field}"
             )
 
         # Check other properties
