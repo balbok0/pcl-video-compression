@@ -89,8 +89,10 @@ Below are, in no particular order, next logical steps for this demo. I will most
 1. Create environment - [Download and install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ## Run on any ouster pcap file
-1. Run `uv run main.py <path-to-pcap-file>`
+1. Run `uv run main.py -i <path-to-pcap-file>`
+
+You will need to have a metadata json file with the same name as pcap file, just .json as an extension.
 
 ## Reproduce results
 1. Download files mentioned above. It should *OS0 128 Rev 07 Urban Drive (2048x10 Dual Returns)* on [Sample Ouster Data](https://static.ouster.dev/sensor-docs/#sample-data). You want to download pcap and metadata json. Place them in the same folder.
-1. Run `uv run benchmark.py <path-to-pcap-file>`
+1. Run `uv run benchmark.py -i <path-to-pcap-file>`
