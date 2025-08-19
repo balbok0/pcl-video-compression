@@ -31,6 +31,8 @@ Then at a read time we decompose them back up into single frame.
 This frame can be transformed by `ouster_sdk` into pointclouds,
 but that is **not** showcased in this code base.
 
+Another cool benefit is that you can just embed point clouds into any file format that allows videos. Like this markdown (not that is not destaggered) ![](./docs/example_RANGE_ch1.mp4)
+
 ## Results
 
 For testing we use a demo pcap + json file from [Sample Ouster Data](https://static.ouster.dev/sensor-docs/#sample-data).
