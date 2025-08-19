@@ -63,11 +63,13 @@ class PCLVideoReader:
 
 
     def fields(self):
-        print(self.tar_file.getmembers())
-        pass
+        raise NotImplementedError("")
+
+        # Something along these lines
+        return self.tar_file.getmembers()
 
     def clip(self, fields: list[str], lower: int, upper: int) -> 'PCLVideoReader':
-        print
+        raise NotImplementedError("")
 
     def close(self):
         self.tar_file.close()
@@ -163,7 +165,6 @@ class PacketIterator:
             field.name: field
             for field in fields
         }
-        self.temp_dir = temp_dir
 
     def __next__(self):
         frames = {}
@@ -185,12 +186,8 @@ class PacketIterator:
                 frames["h"] = field_frame.shape[0]
                 frames["w"] = field_frame.shape[1]
 
-        # TODO: Populate everything else
-
         return frames
 
-    def __del__(self):
-        shutil.rmtree(self.temp_dir)
 
 """
 Packet class

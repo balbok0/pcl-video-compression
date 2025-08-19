@@ -1,9 +1,10 @@
-from collections import defaultdict
-import shutil
+import argparse
 import subprocess
 import tarfile
 import tempfile
 import pickle
+import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,7 +15,6 @@ import ouster.sdk
 import ouster.sdk.client
 import ouster.sdk.pcap
 import tqdm
-import yaml
 
 def _field_type_to_dict(field_type):
     result = {}
@@ -47,22 +47,61 @@ class AdditionalMeta:
             yield slot, value
 
 
+def is_empty_folder(p: Path) -> bool:
+    if not (p.exists() and p.is_dir()):
+        return False
 
-def main_pcap():
-    # pcap_file = Path(__file__).parent / "data" / "OS-0-128_v3.0.1_2048x10_20230216_173241-000.pcap"
-    pcap_file = Path(__file__).parent / "tests" / "aux_files" / "small-pcap-test.pcap"
+    for _ in p.glob("*"):
+        return False
 
-    fields_channels, frame_rate, add_meta = make_png_folders(pcap_file)
+    return True
 
-    make_videos(fields_channels, frame_rate)
 
-    make_tarfile(Path("data/packets/"), pcap_file.with_suffix(".json"), add_meta)
+def create_tar_from_pcap(
+    pcap_file: Path,
+    output_file_path: Path | None = None,
+    work_dir: Path | None = None,
+    json_path: Path | None = None,
+    qp_level: int = 0,
+):
+    is_work_dir_temp = work_dir is None
+    work_dir = work_dir or Path(tempfile.mkdtemp())
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    if not is_empty_folder(work_dir):
+        raise ValueError("Work directory is not empty. This will lead to weird results!")
+
+    output_file_path = output_file_path or pcap_file.with_suffix(".tar")
+    json_path = json_path or pcap_file.with_suffix(".json")
+
+    fields_channels, frame_rate, add_meta = make_png_folders(
+        pcap_file,
+        out_folder_path=work_dir
+    )
+
+    make_videos(
+        fields_channels,
+        frame_rate,
+        root_folder_path=work_dir,
+        qp_level=qp_level,
+    )
+
+    make_tarfile(
+        packets_path=work_dir,
+        json_path=json_path,
+        add_meta=add_meta,
+        output_path=output_file_path
+    )
+
+    if is_work_dir_temp:
+        shutil.rmtree(work_dir)
 
 
 def parse_frame(
     frame: np.ndarray,
     packet_ts: int,
     field: str,
+    out_folder: Path,
 ) -> set[tuple[str, str]]:
     # Convert a u32|16|8 -> 4x|2x|1xu8 channels
     frame = frame[..., None]
@@ -80,14 +119,17 @@ def parse_frame(
         fields_channels_types.add((field, channel, frame.dtype))
         success, png_bytes = cv2.imencode(".png", frame[..., channel])
         assert success
-        png_path = Path(f"data/packets/{field}/ch{channel}/{packet_ts}.png")
+        png_path = Path(out_folder / field / f"ch{channel}" / f"{packet_ts}.png")
         png_path.parent.mkdir(parents=True, exist_ok=True)
         with open(png_path, mode="wb") as f:
             f.write(png_bytes)
     return fields_channels_types
 
 
-def make_png_folders(pcap_file: Path):
+def make_png_folders(
+    pcap_file: Path,
+    out_folder_path: Path = Path("data/packets/")
+):
     source = ouster.sdk.pcap.pcap_scan_source.PcapScanSource(str(pcap_file.absolute())).single_source(0)
 
 
@@ -106,13 +148,13 @@ def make_png_folders(pcap_file: Path):
 
         for field in packet.fields:
             frame = packet.field(field)
-            fields_channels_types.update(parse_frame(frame, packet_ts, field))
+            fields_channels_types.update(parse_frame(frame, packet_ts, field, out_folder_path))
 
 
-        parse_frame(packet.pose.reshape(-1, 16), packet_ts, "pose")
+        parse_frame(packet.pose.reshape(-1, 16), packet_ts, "pose", out_folder_path)
 
         for field_name in ["timestamp", "packet_timestamp", "status", "alert_flags"]:
-            folder_name = Path("data/packets") / field_name
+            folder_name = out_folder_path / field_name
             folder_name.mkdir(parents=True, exist_ok=True)
             np.save(folder_name / f"{packet_ts}.npy", getattr(packet, field_name))
         # fields_channels_types.update(parse_frame(packet.status[..., np.newaxis], packet_ts, "status"))
@@ -142,46 +184,53 @@ def make_png_folders(pcap_file: Path):
 def make_videos(
     fields_channels: set[tuple[str, int, np.dtype]],
     frame_rate: float,
+    root_folder_path: Path = Path("data/packets/"),
+    qp_level: int = 0
 ):
     for field, channel, dtype in fields_channels:
-        folder_path = f"data/packets/{field}/ch{channel}"
+        folder_path = root_folder_path / field / f"ch{channel}"
+        out_path_video_path = root_folder_path / f"{field}_ch{channel}.mp4"
 
-        subprocess.check_output(
-            [
-                "ffmpeg",
-                "-framerate",
-                f"{frame_rate}",
-                "-pattern_type",
-                "glob",
-                "-i",
-                f"{folder_path}/*.png",
-                "-pix_fmt",
-                "gray",
-                "-c:v",
-                "libx265",
-                "-preset",
-                "ultrafast",
-                "-qp",
-                "0",
+        sp_args = [
+            "ffmpeg",
+            "-framerate",
+            f"{frame_rate}",
+            "-pattern_type",
+            "glob",
+            "-i",
+            f"{folder_path}/*.png",
+            "-pix_fmt",
+            "gray",
+            "-c:v",
+            "libx265",
+            "-preset",
+            "ultrafast",
+            "-qp",
+            f"{qp_level}",
+        ]
+
+        if qp_level == 0:
+            sp_args.extend([
                 "-x265-params",
                 "lossless=1",
-                "-y",
-                f"data/packets/{field}_ch{channel}.mp4",
-            ],
-            # stdout=subprocess.PIPE,
-            # stderr=subprocess.PIPE,
-        )
-        # shutil.rmtree(folder_path)
+            ])
+
+        sp_args.extend([
+            "-y",
+            str(out_path_video_path.absolute()),
+        ])
+
+        subprocess.check_output(sp_args)
 
 
 def make_tarfile(
     packets_path: Path,
     json_path: Path,
-    add_meta: AdditionalMeta
+    add_meta: AdditionalMeta,
+    output_path: Path | None = None,
 ):
-
-    # packets_path = Path("data/packets/")
-    with tarfile.TarFile(packets_path / "out.tar", mode="w") as tf:
+    output_path = output_path or packets_path / "out.tar"
+    with tarfile.TarFile(output_path, mode="w") as tf:
         for mp4_path in packets_path.glob("*.mp4"):
             tf.add(mp4_path, mp4_path.name)
 
@@ -203,9 +252,13 @@ def make_tarfile(
 
 
 def main():
-    # main_bag()
-    main_pcap()
-    # main_ply()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-i", "--input_file", type=Path, default=None)
+    args = parser.parse_args()
+
+    input_file = args.input_file or "data/OS-0-128_v3.0.1_2048x10_20230216_173241-000.pcap"
+    create_tar_from_pcap(input_file)
 
 if __name__ == "__main__":
     main()
