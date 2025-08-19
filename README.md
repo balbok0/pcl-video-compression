@@ -46,8 +46,8 @@ That additional information should have minimal effect on file size.
 | Original     | 5.2 GB    |             0 |
 | 0 (lossless) | 1.3 GB    |         75.08 |
 | 4            | 1.6 GB    |         69.71 |
-| 10           |           |          |
-| 25           |           |
+| 10           | 1.2 GB    |         76.21 |
+| 25           | 587M      |         88.96 |
 
 ### Runtime
 
