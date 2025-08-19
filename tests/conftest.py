@@ -7,7 +7,7 @@ AUX_FILES_PATH = TESTS_ROOT_PATH / "aux_files"
 
 @pytest.fixture
 def tar_path() -> Path:
-    return AUX_FILES_PATH / "out.tar"
+    return AUX_FILES_PATH / "small-pcap-test.tar"
 
 @pytest.fixture
 def raw_pcap_path() -> Path:
