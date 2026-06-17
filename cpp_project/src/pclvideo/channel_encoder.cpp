@@ -49,7 +49,9 @@ ChannelEncoder::ChannelEncoder(const std::filesystem::path& out_path, int width,
 
     av_opt_set(cctx_->priv_data, "preset", "ultrafast", 0);
     av_opt_set_int(cctx_->priv_data, "qp", qp_level, 0);
-    std::string x265 = "bframes=0";
+    // log-level=none silences libx265's own info/summary output (it bypasses
+    // libav's logging).
+    std::string x265 = "log-level=none:bframes=0";
     if (qp_level == 0) x265 += ":lossless=1";
     if (gop_size)
         x265 += (x265.empty() ? "" : ":") + ("keyint=" + std::to_string(*gop_size));
