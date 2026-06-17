@@ -46,15 +46,15 @@ That additional information should have minimal effect on file size.
 | QP (value)   | File Size | Reduction (%) |
 | ------------ | --------- | ------------- |
 | Original     | 5.2 GB    |             0 |
-| 0 (lossless) | 1.3 GB    |         75.08 |
-| 4            | 1.6 GB    |         69.71 |
-| 10           | 1.2 GB    |         76.21 |
-| 25           | 587M      |         88.96 |
+| 0 (lossless) | 1.3 GB    |         74.29 |
+| 4            | 1.6 GB    |         68.92 |
+| 10           | 1.3 GB    |         75.42 |
+| 25           | 628M      |         88.17 |
 
 ### Runtime
 
-Runtime of script is consistent across all QP values, close to 100s.
-Pcap file used in this demonstration is 131s long, so it is faster than real time.
+Runtime ranges from ~47s to ~60s across QP values.
+Pcap file used in this demonstration is 131s long, so it is comfortably faster than real time.
 That being said there is a lot of obvious places to optimize code, which should be done if this concept is ever used in production.
 
 ### Compression Error
@@ -83,7 +83,6 @@ Below are, in no particular order, next logical steps for this demo. I will most
   * There is also an interesting question of whether video compression can be used for denoising pointclouds. HW accelerated encoders are fast enough to introduce minimal latency to perception pipeline.
 * Evaluate compression across different datasets. The ouster demos are nice, but they are city driving which yields nicely to video compression. More esoteric datasets might have smaller gains.
 * Write it properly, probably in C++, interfacing directly with ffmpeg sdk.
-  * This will be a massive speed-up and probably more reliable than what I'm doing rn (pcap -> folders of pngs -> multiple .mp4 -> .tar)
 * Finish up grabbing all of the non-frame properties in the `LidarScan` in `ouster_sdk`. (i.e. long tail)
 
 ## Reproduction

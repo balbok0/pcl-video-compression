@@ -126,6 +126,14 @@ class PCLVideoReader:
         for field in fields_channels.keys():
             fields_channels[field] = list(sorted(fields_channels[field]))
 
+        # Map each field to the dtype needed to undo the byte-split on read.
+        # Sensor fields come from field_types; fields absent there (e.g. pose)
+        # fall back to the original dtype recorded in fields_to_channels.
+        field_dtypes = {ft.name: ft.element_type for ft in self.field_types}
+        for field, channels in fields_channels.items():
+            if field not in field_dtypes:
+                field_dtypes[field] = np.dtype(channels[0][1])
+
         # Proof of concept. Should read from file directly
         td = tempfile.gettempdir()
         td_path = Path(td)
@@ -147,7 +155,7 @@ class PCLVideoReader:
             fields_vid_captures[field] = field_vids
         return PacketIterator(
             field_vid_captures=fields_vid_captures,
-            fields=self.field_types,
+            field_dtypes=field_dtypes,
             temp_dir=td_path
         )
 
@@ -156,15 +164,12 @@ class PacketIterator:
     def __init__(
         self,
         field_vid_captures: dict[str, list[Iterator[av.VideoFrame]]],
-        fields: ouster.sdk.client.data.FieldTypes,
+        field_dtypes: dict[str, np.dtype],
         temp_dir: Path
     ):
 
         self.field_vid_captures = field_vid_captures
-        self.fields = {
-            field.name: field
-            for field in fields
-        }
+        self.field_dtypes = field_dtypes
 
     def __next__(self):
         frames = {}
@@ -179,7 +184,7 @@ class PacketIterator:
                 continue
 
             cat_view = np.concatenate([a[..., np.newaxis] for a in field_frames], axis=-1)
-            field_frame = cat_view.view(self.fields[field].element_type)[..., 0]
+            field_frame = cat_view.view(self.field_dtypes[field])[..., 0]
 
             frames[field] = field_frame
             if "h" not in frames:

@@ -6,8 +6,12 @@ from pathlib import Path
 import numpy as np
 import ouster.sdk
 
-from main import create_tar_from_pcap
+from main import create_tar_from_pcap as create_tar_from_pcap_streamlined
 from pcl_compression.reader import PCLVideoReader
+
+IMPLEMENTATIONS = {
+    "streamlined": create_tar_from_pcap_streamlined,
+}
 
 PCAP_FILE = Path("data/OS-0-128_v3.0.1_2048x10_20230216_173241-000.pcap")
 JSON_FILE = Path("data/OS-0-128_v3.0.1_2048x10_20230216_173241.json")
@@ -16,17 +20,19 @@ NUM_TEST_RUNS = 1
 
 def benchtest_qp(
     qp_level: int,
+    impl_name: str,
     pcap_file: Path = PCAP_FILE,
     json_file: Path = JSON_FILE,
 ) -> tuple[list[int], list[Path]]:
+    convert = IMPLEMENTATIONS[impl_name]
     durations = []
     file_paths = []
 
     for run_idx in range(NUM_TEST_RUNS):
-        run_file_path = Path(f"bench_test_qp_{qp_level}_run_{run_idx}.tar")
+        run_file_path = Path(f"bench_test_{impl_name}_qp_{qp_level}_run_{run_idx}.tar")
 
         start_time = time.time_ns()
-        create_tar_from_pcap(
+        convert(
             pcap_file=pcap_file,
             output_file_path=run_file_path,
             json_path=json_file,
@@ -74,21 +80,23 @@ def main():
 
     args = parser.parse_args()
 
-    times_per_qp: dict[int, int] = {}
-    paths_per_qp: dict[int, Path] = {}
+    times: dict[tuple[str, int], list[int]] = {}
+    paths: dict[tuple[str, int], list[Path]] = {}
 
-    for qp in [0, 4, 10, 25]:
-        timing, paths = benchtest_qp(qp, args.input, args.json_input)
-        times_per_qp[qp] = timing
-        paths_per_qp[qp] = paths
+    for impl_name in IMPLEMENTATIONS:
+        for qp in [0, 4, 10, 25]:
+            timing, run_paths = benchtest_qp(qp, impl_name, args.input, args.json_input)
+            times[(impl_name, qp)] = timing
+            paths[(impl_name, qp)] = run_paths
 
-    for qp in times_per_qp.keys():
+    for (impl_name, qp) in times.keys():
         print("=======================================")
+        print(f"{impl_name = }")
         print(f"{qp = }")
-        print(f"{times_per_qp[qp][0] = }")
-        print([f.stat().st_size for f in paths_per_qp[qp]][0])
+        print(f"duration_ns = {times[(impl_name, qp)][0]}")
+        print(f"size_bytes = {paths[(impl_name, qp)][0].stat().st_size}")
         print(get_mean_abs_error_per_field(
-            paths_per_qp[qp][0],
+            paths[(impl_name, qp)][0],
             args.input,
         ))
         print("=======================================")
