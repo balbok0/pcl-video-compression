@@ -27,6 +27,7 @@ add_library(pclvideo
   src/pclvideo/tar_writer.cpp
   src/pclvideo/yaml_meta_writer.cpp
   src/pclvideo/channel_encoder.cpp
+  src/pclvideo/tar_video_writer.cpp
 )
 target_include_directories(pclvideo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(pclvideo PUBLIC PkgConfig::LIBAV)
@@ -51,3 +52,7 @@ add_test(NAME test_yaml_meta_writer COMMAND test_yaml_meta_writer)
 add_executable(test_channel_encoder tests/test_channel_encoder.cpp)
 target_link_libraries(test_channel_encoder PRIVATE pclvideo doctest::doctest PkgConfig::LIBAV)
 add_test(NAME test_channel_encoder COMMAND test_channel_encoder)
+
+add_executable(test_tar_video_writer tests/test_tar_video_writer.cpp)
+target_link_libraries(test_tar_video_writer PRIVATE pclvideo doctest::doctest PkgConfig::LIBAV)
+add_test(NAME test_tar_video_writer COMMAND test_tar_video_writer)
