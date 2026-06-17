@@ -14,7 +14,6 @@ reads it unchanged.
 """
 
 import argparse
-import pickle
 import re
 import shutil
 import subprocess
@@ -29,6 +28,7 @@ import ouster.sdk
 import ouster.sdk.client
 import ouster.sdk.pcap
 import tqdm
+import yaml
 
 
 def _field_type_to_dict(field_type):
@@ -55,6 +55,28 @@ class AdditionalMeta:
             if slot == "field_types":
                 value = [_field_type_to_dict(ft) for ft in value]
             yield slot, value
+
+
+def _meta_to_yaml_doc(meta: "AdditionalMeta") -> dict:
+    """Convert AdditionalMeta into plain YAML-serializable types."""
+    d = dict(meta)
+    field_types = []
+    for ft in d["field_types"]:
+        field_types.append({
+            "name": str(ft["name"]),
+            "element_type": np.dtype(ft["element_type"]).name,   # e.g. "uint32"
+            "extra_dims": list(ft["extra_dims"]),
+            "field_class": int(ft["field_class"]),               # Ouster FieldClass -> int
+        })
+    fields_to_channels = {
+        field: [[int(c), np.dtype(dt).name] for c, dt in channels]
+        for field, channels in d["fields_to_channels"].items()
+    }
+    return {
+        "num_scans": int(d["num_scans"]),
+        "field_types": field_types,
+        "fields_to_channels": fields_to_channels,
+    }
 
 
 def is_empty_folder(p: Path) -> bool:
@@ -223,9 +245,9 @@ def make_tarfile(
             tf.add(npy_path, npy_path.relative_to(work_dir))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            f_name = Path(tmpdir) / "_pcl_video_metadata.pkl"
-            with open(f_name, mode="wb") as f:
-                pickle.dump(dict(add_meta), f)
+            f_name = Path(tmpdir) / "_pcl_video_metadata.yaml"
+            with open(f_name, mode="w") as f:
+                yaml.safe_dump(_meta_to_yaml_doc(add_meta), f, sort_keys=False)
             tf.add(f_name, f_name.name)
 
 
