@@ -56,3 +56,30 @@ add_test(NAME test_channel_encoder COMMAND test_channel_encoder)
 add_executable(test_tar_video_writer tests/test_tar_video_writer.cpp)
 target_link_libraries(test_tar_video_writer PRIVATE pclvideo doctest::doctest PkgConfig::LIBAV)
 add_test(NAME test_tar_video_writer COMMAND test_tar_video_writer)
+
+# --- pcap CLI front-end (the only target that depends on the Ouster SDK) ---
+# Guarded so the Ouster-free core library and its tests build independently.
+option(PCLVIDEO_BUILD_CLI "Build the pcap-reading pcl2tar CLI (needs Ouster SDK)" ON)
+if(PCLVIDEO_BUILD_CLI)
+  # ouster-sdk 0.14 bundles an old fmt that fails to compile under C++20 with
+  # recent clang (consteval errors). Build the SDK and the CLI that includes its
+  # headers as C++17; the Ouster-free core above stays C++20.
+  set(CMAKE_CXX_STANDARD 17)
+  set(BUILD_VIZ OFF CACHE BOOL "" FORCE)
+  set(BUILD_PCAP ON CACHE BOOL "" FORCE)
+  set(BUILD_OSF OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(
+    ouster_sdk
+    GIT_REPOSITORY https://github.com/ouster-lidar/ouster-sdk.git
+    GIT_TAG release-0.14.0
+    # sdk-extensions is a private submodule not referenced by the CMake build.
+    GIT_SUBMODULES ""
+  )
+  FetchContent_MakeAvailable(ouster_sdk)
+
+  add_executable(pcl2tar src/cli/main.cpp)
+  target_link_libraries(pcl2tar PRIVATE pclvideo
+    OusterSDK::ouster_client OusterSDK::ouster_pcap)
+endif()
