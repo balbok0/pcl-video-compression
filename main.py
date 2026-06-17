@@ -21,6 +21,7 @@ import subprocess
 import tarfile
 import tempfile
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +30,42 @@ import ouster.sdk.client
 import ouster.sdk.pcap
 import tqdm
 
-from main import AdditionalMeta, is_empty_folder
+
+def _field_type_to_dict(field_type):
+    result = {}
+    for field_name in [
+        "name",
+        "element_type",
+        "extra_dims",
+        "field_class",
+    ]:
+        result[field_name] = getattr(field_type, field_name)
+    return result
+
+
+@dataclass(slots=True)
+class AdditionalMeta:
+    num_scans: int
+    field_types: list[ouster.sdk.client.data.FieldTypes]
+    fields_to_channels: dict[str, list[tuple[int, np.dtype]]]
+
+    def __iter__(self):
+        for slot in self.__slots__:
+            value = getattr(self, slot)
+            if slot == "field_types":
+                value = [_field_type_to_dict(ft) for ft in value]
+            yield slot, value
+
+
+def is_empty_folder(p: Path) -> bool:
+    if not (p.exists() and p.is_dir()):
+        return False
+
+    for _ in p.glob("*"):
+        return False
+
+    return True
+
 
 # Fields that are stored as raw per-scan .npy rather than encoded as video.
 AUX_FIELDS = ["timestamp", "packet_timestamp", "status", "alert_flags"]
