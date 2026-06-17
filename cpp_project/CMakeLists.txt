@@ -21,6 +21,7 @@ add_library(pclvideo
   src/pclvideo/dtype.cpp
   src/pclvideo/npy_writer.cpp
   src/pclvideo/tar_writer.cpp
+  src/pclvideo/yaml_meta_writer.cpp
 )
 target_include_directories(pclvideo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -36,3 +37,7 @@ add_test(NAME test_npy_writer COMMAND test_npy_writer)
 add_executable(test_tar_writer tests/test_tar_writer.cpp)
 target_link_libraries(test_tar_writer PRIVATE pclvideo doctest::doctest)
 add_test(NAME test_tar_writer COMMAND test_tar_writer)
+
+add_executable(test_yaml_meta_writer tests/test_yaml_meta_writer.cpp)
+target_link_libraries(test_yaml_meta_writer PRIVATE pclvideo doctest::doctest)
+add_test(NAME test_yaml_meta_writer COMMAND test_yaml_meta_writer)
