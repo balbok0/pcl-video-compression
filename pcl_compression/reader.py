@@ -1,4 +1,3 @@
-import pickle
 import shutil
 import tarfile
 import tempfile
@@ -44,16 +43,16 @@ class PCLVideoReader:
 
         self.tar_file = tarfile.TarFile(self.file_path, mode="r")
 
-        buf = self.tar_file.extractfile("_pcl_video_metadata.pkl")
-        self._pcl_vid_metadata = pickle.load(buf)
+        buf = self.tar_file.extractfile("_pcl_video_metadata.yaml")
+        self._pcl_vid_metadata = yaml.safe_load(buf)
         self._field_types = []
         self._fields = []
         for ft_dict in self._pcl_vid_metadata["field_types"]:
-            self.field_types.append(ouster.sdk.client.data.FieldType(
+            self._field_types.append(ouster.sdk.client.data.FieldType(
                 name=ft_dict["name"],
-                dtype=ft_dict["element_type"].type,
-                extra_dims=ft_dict["extra_dims"],
-                field_class=ft_dict["field_class"],
+                dtype=np.dtype(ft_dict["element_type"]).type,
+                extra_dims=tuple(ft_dict["extra_dims"]),
+                field_class=ouster.sdk.client.FieldClass(ft_dict["field_class"]),
             ))
             self._fields.append(ft_dict["name"])
 

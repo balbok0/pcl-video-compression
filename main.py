@@ -14,13 +14,13 @@ reads it unchanged.
 """
 
 import argparse
-import pickle
 import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -28,8 +28,66 @@ import ouster.sdk
 import ouster.sdk.client
 import ouster.sdk.pcap
 import tqdm
+import yaml
 
-from main import AdditionalMeta, is_empty_folder
+
+def _field_type_to_dict(field_type):
+    result = {}
+    for field_name in [
+        "name",
+        "element_type",
+        "extra_dims",
+        "field_class",
+    ]:
+        result[field_name] = getattr(field_type, field_name)
+    return result
+
+
+@dataclass(slots=True)
+class AdditionalMeta:
+    num_scans: int
+    field_types: list[ouster.sdk.client.data.FieldTypes]
+    fields_to_channels: dict[str, list[tuple[int, np.dtype]]]
+
+    def __iter__(self):
+        for slot in self.__slots__:
+            value = getattr(self, slot)
+            if slot == "field_types":
+                value = [_field_type_to_dict(ft) for ft in value]
+            yield slot, value
+
+
+def _meta_to_yaml_doc(meta: "AdditionalMeta") -> dict:
+    """Convert AdditionalMeta into plain YAML-serializable types."""
+    d = dict(meta)
+    field_types = []
+    for ft in d["field_types"]:
+        field_types.append({
+            "name": str(ft["name"]),
+            "element_type": np.dtype(ft["element_type"]).name,   # e.g. "uint32"
+            "extra_dims": list(ft["extra_dims"]),
+            "field_class": int(ft["field_class"]),               # Ouster FieldClass -> int
+        })
+    fields_to_channels = {
+        field: [[int(c), np.dtype(dt).name] for c, dt in channels]
+        for field, channels in d["fields_to_channels"].items()
+    }
+    return {
+        "num_scans": int(d["num_scans"]),
+        "field_types": field_types,
+        "fields_to_channels": fields_to_channels,
+    }
+
+
+def is_empty_folder(p: Path) -> bool:
+    if not (p.exists() and p.is_dir()):
+        return False
+
+    for _ in p.glob("*"):
+        return False
+
+    return True
+
 
 # Fields that are stored as raw per-scan .npy rather than encoded as video.
 AUX_FIELDS = ["timestamp", "packet_timestamp", "status", "alert_flags"]
@@ -187,9 +245,9 @@ def make_tarfile(
             tf.add(npy_path, npy_path.relative_to(work_dir))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            f_name = Path(tmpdir) / "_pcl_video_metadata.pkl"
-            with open(f_name, mode="wb") as f:
-                pickle.dump(dict(add_meta), f)
+            f_name = Path(tmpdir) / "_pcl_video_metadata.yaml"
+            with open(f_name, mode="w") as f:
+                yaml.safe_dump(_meta_to_yaml_doc(add_meta), f, sort_keys=False)
             tf.add(f_name, f_name.name)
 
 
